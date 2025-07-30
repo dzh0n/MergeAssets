@@ -1,7 +1,7 @@
 <?php
 /**
  * MergeAssets — объединяет CSS или JS файлы, сохраняет их под заданным именем и добавляет версию
- * Поддерживает список файлов и маски через glob.
+ * Поддерживает список файлов и маски через glob().
  *
  * Параметры:
  *   &type      - тип файлов: 'css' или 'js' (по умолчанию 'css')
@@ -68,7 +68,7 @@ if (!$needRebuild && !empty($fileList)) {
     }
 }
 
-// собираем и сохраняем файл
+// собираем и сохраняем файл (безопасно, с перезаписью)
 if ($needRebuild && !empty($fileList)) {
     $content = '';
     foreach ($fileList as $filePath) {
@@ -78,10 +78,10 @@ if ($needRebuild && !empty($fileList)) {
             $content .= "\n/* --- {$relative} --- */\n" . $fileContent;
         }
     }
-    file_put_contents($outputFile, $content);
+    file_put_contents($outputFile, $content, LOCK_EX);
 }
 
-// версия всегда текущее время
+// версия — всегда текущее время
 $version = time();
 $versionedUrl = $outputUrl . '?v=' . $version;
 
