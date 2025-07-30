@@ -1,25 +1,23 @@
 <?php
 /**
- * MergeAssets — объединяет CSS или JS файлы, сохраняет их под заданным именем и добавляет версию
- * Поддерживает список файлов и маски через glob().
+ * MergeAssets — объединяет CSS или JS файлы, всегда пересоздавая результат.
  *
  * Параметры:
- *   &type      - тип файлов: 'css' или 'js' (по умолчанию 'css')
- *   &files     - список файлов или масок через запятую, например:
- *                /assets/css/reset.css,/assets/css/blocks/*.css
- *   &filename  - имя итогового файла (по умолчанию 'styles.min.css' для css и 'bundle.min.js' для js)
- *   &path      - путь относительно корня сайта, куда сохранять объединённый файл (по умолчанию 'assets/templates')
+ *   &type      - 'css' или 'js' (по умолчанию 'css')
+ *   &files     - список файлов или масок через запятую
+ *   &filename  - имя итогового файла (по умолчанию 'styles.min.css' или 'bundle.min.js')
+ *   &path      - папка для сохранения (относительно корня, по умолчанию 'assets/templates')
  *
- * Пример вызова:
+ * Пример:
  * [[MergeAssets?
- *   &type=`css`
- *   &files=`/assets/css/reset.css,/assets/css/blocks/*.css`
- *   &filename=`styles.min.css`
- *   &path=`assets/templates`
+ *   &type=`js`
+ *   &files=`/assets/js/lib/jquery.js,/assets/js/app/*.js`
+ *   &filename=`bundle.js`
+ *   &path=`assets/templates/js`
  * ]]
  */
 
-$type     = isset($type) ? strtolower(trim($type)) : 'css'; // css или js
+$type     = isset($type) ? strtolower(trim($type)) : 'css';
 $files    = isset($files) ? trim($files) : '';
 $path     = isset($path) ? trim($path, '/') : 'assets/templates';
 $filename = isset($filename) ? trim($filename) : ($type === 'js' ? 'bundle.min.js' : 'styles.min.css');
@@ -30,14 +28,13 @@ $baseDir     = MODX_BASE_PATH . $path . '/';
 $baseUrl     = MODX_SITE_URL . $path . '/';
 $outputFile  = $baseDir . $filename;
 $outputUrl   = $baseUrl . $filename;
-$needRebuild = !file_exists($outputFile);
 
 // создаём директорию, если не существует
 if (!is_dir($baseDir)) {
     mkdir($baseDir, 0755, true);
 }
 
-// собираем список файлов с сохранением порядка
+// собираем список файлов
 $fileList = [];
 foreach (explode(',', $files) as $entry) {
     $entry = trim($entry);
@@ -53,45 +50,29 @@ foreach (explode(',', $files) as $entry) {
     }
 }
 
-// удаляем дубликаты, сохраняя порядок
 $fileList = array_values(array_unique($fileList));
 
-// проверяем, нужно ли пересобирать файл
-if (!$needRebuild && !empty($fileList)) {
-    $cacheTime = filemtime($outputFile);
-    foreach ($fileList as $filePath) {
-        if (file_exists($filePath) && filemtime($filePath) > $cacheTime) {
-            $needRebuild = true;
-            break;
-        }
+// собираем контент
+$content = '';
+foreach ($fileList as $filePath) {
+    if (file_exists($filePath)) {
+        $relative = str_replace(MODX_BASE_PATH, '/', $filePath);
+        $fileContent = file_get_contents($filePath);
+        $content .= "\n/* --- {$relative} --- */\n" . $fileContent;
     }
 }
 
-// собираем и сохраняем файл (удаляем перед записью)
-if ($needRebuild && !empty($fileList)) {
-    $content = '';
-    foreach ($fileList as $filePath) {
-        if (file_exists($filePath)) {
-            $relative = str_replace(MODX_BASE_PATH, '/', $filePath);
-            $fileContent = file_get_contents($filePath);
-            $content .= "\n/* --- {$relative} --- */\n" . $fileContent;
-        }
-    }
-
-    // Удаляем старый файл перед записью
-    if (file_exists($outputFile)) {
-        unlink($outputFile);
-    }
-
-    // Записываем новый файл
-    file_put_contents($outputFile, $content, LOCK_EX);
+// удаляем старый файл и пишем новый
+if (file_exists($outputFile)) {
+    unlink($outputFile);
 }
+file_put_contents($outputFile, $content, LOCK_EX);
 
 // версия — всегда текущее время
 $version = time();
 $versionedUrl = $outputUrl . '?v=' . $version;
 
-// возвращаем HTML-тег
+// возвращаем тег
 if ($type === 'js') {
     return '<script src="' . $versionedUrl . '"></script>';
 } else {
