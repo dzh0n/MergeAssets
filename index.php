@@ -6,7 +6,7 @@
  * Параметры:
  *   &type      - тип файлов: 'css' или 'js' (по умолчанию 'css')
  *   &files     - список файлов или масок через запятую, например:
- *                /assets/css/reset.css,/assets/css/*.css
+ *                /assets/css/reset.css,/assets/css/blocks/*.css
  *   &filename  - имя итогового файла (по умолчанию 'styles.min.css' для css и 'bundle.min.js' для js)
  *   &path      - путь относительно корня сайта, куда сохранять объединённый файл (по умолчанию 'assets/templates')
  *
@@ -46,7 +46,6 @@ foreach (explode(',', $files) as $entry) {
     if (strpos($entry, '*') !== false || strpos($entry, '?') !== false) {
         $matches = glob($realPath);
         if ($matches) {
-            // НЕ сортируем, чтобы сохранить порядок glob()
             $fileList = array_merge($fileList, $matches);
         }
     } elseif (file_exists($realPath)) {
@@ -68,7 +67,7 @@ if (!$needRebuild && !empty($fileList)) {
     }
 }
 
-// собираем и сохраняем файл (безопасно, с перезаписью)
+// собираем и сохраняем файл (удаляем перед записью)
 if ($needRebuild && !empty($fileList)) {
     $content = '';
     foreach ($fileList as $filePath) {
@@ -78,6 +77,13 @@ if ($needRebuild && !empty($fileList)) {
             $content .= "\n/* --- {$relative} --- */\n" . $fileContent;
         }
     }
+
+    // Удаляем старый файл перед записью
+    if (file_exists($outputFile)) {
+        unlink($outputFile);
+    }
+
+    // Записываем новый файл
     file_put_contents($outputFile, $content, LOCK_EX);
 }
 
