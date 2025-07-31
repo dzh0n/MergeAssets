@@ -1,18 +1,24 @@
 <?php
 /**
- * MergeAssets — объединяет CSS или JS файлы, всегда пересоздавая результат.
+ * MergeAssets — объединяет CSS или JS файлы, пересоздавая итоговый файл при каждом вызове.
+ *
+ * Поддерживает:
+ * - список файлов;
+ * - маски (через glob);
+ * - исключение самого результирующего файла из сборки;
+ * - добавление версии через ?v=TIMESTAMP.
  *
  * Параметры:
  *   &type      - 'css' или 'js' (по умолчанию 'css')
  *   &files     - список файлов или масок через запятую
- *   &filename  - имя итогового файла (по умолчанию 'styles.min.css' или 'bundle.min.js')
- *   &path      - папка для сохранения (относительно корня, по умолчанию 'assets/templates')
+ *   &filename  - имя объединённого файла (по умолчанию 'styles.min.css' или 'bundle.min.js')
+ *   &path      - папка для сохранения (относительно корня сайта, по умолчанию 'assets/templates')
  *
  * Пример:
  * [[MergeAssets?
  *   &type=`js`
- *   &files=`/assets/js/lib/jquery.js,/assets/js/app/*.js`
- *   &filename=`bundle.js`
+ *   &files=`/assets/templates/js/lib/jquery.js,/assets/templates/js/*.js`
+ *   &filename=`bundle.min.js`
  *   &path=`assets/templates/js`
  * ]]
  */
@@ -50,7 +56,12 @@ foreach (explode(',', $files) as $entry) {
     }
 }
 
-$fileList = array_values(array_unique($fileList));
+// исключаем сам файл сборки (если попал по маске)
+$fileList = array_filter(
+    array_unique($fileList),
+    fn($file) => realpath($file) !== realpath($outputFile)
+);
+$fileList = array_values($fileList);
 
 // собираем контент
 $content = '';
@@ -62,7 +73,7 @@ foreach ($fileList as $filePath) {
     }
 }
 
-// удаляем старый файл и пишем новый
+// удаляем старый файл и записываем новый
 if (file_exists($outputFile)) {
     unlink($outputFile);
 }
@@ -72,7 +83,7 @@ file_put_contents($outputFile, $content, LOCK_EX);
 $version = time();
 $versionedUrl = $outputUrl . '?v=' . $version;
 
-// возвращаем тег
+// выводим HTML-тег
 if ($type === 'js') {
     return '<script src="' . $versionedUrl . '"></script>';
 } else {
